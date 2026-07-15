@@ -1,7 +1,7 @@
-name: "Olink_Project"
+name: Olink_Project
 output_dir: ../docs
 navbar:
-  title: "Olink_Project"
+  title: Olink_Project
   left:
   - text: Home
     href: index.html
@@ -9,6 +9,10 @@ navbar:
     href: about.html
   - text: License
     href: license.html
+  right:
+  - icon: fab fa-github
+    text: Source code
+    href: https://github.com/Sophie-Alice/Olink_Project
 output:
   workflowr::wflow_html:
     toc: yes
