@@ -1,0 +1,15 @@
+---
+title: "Inspecting_dats"
+author: "Sophie.Alice"
+date: "2026-07-15"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+```{r}
+
+```
+
