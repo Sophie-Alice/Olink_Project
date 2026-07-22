@@ -4,12 +4,907 @@ author: "Sophie.Alice"
 date: "2026-07-15"
 output: workflowr::wflow_html
 editor_options:
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
-## Introduction
+# Setup
 
-```{r}
+```{r, message=FALSE, warning = FALSE}
+rm(list = ls())
+gc()
+
+library(here)
+library(dplyr)
+library(readr)
+library(stringr)
+library(tibble)
+library(ggplot2)
+library(OlinkAnalyze)
+library(DT)
+library(limma)
+library(tidyverse)
+library(tidyr)
+library(ggrepel)
+```
+
+
+# Functions
+
+```{r, warning = FALSE}
+
+
+##################################### Tables
+
+library(DT)
+show_table <- function(df) {
+  DT::datatable(
+    df,
+    extensions = 'Buttons', 
+    options = list(
+      dom = 'Blfrtip',                       
+      buttons = c('copy', 'csv', 'excel', 'pdf'),
+      pageLength = 10,                      
+      lengthMenu = c(10, 25, 50, 100),
+      autoWidth = TRUE,
+      columnDefs = list(list(
+        targets = '_all',
+        className = 'dt-nowrap'
+      ))
+    ),
+    filter = 'top',                         
+    class = 'cell-border stripe hover nowrap'       
+  )
+}
+
+
+#################################  PCA Plots
+
+plot_pca_dataset <- function(data, color_by = c("Group", "Experiment"), title_suffix = "") {
+  color_by <- match.arg(color_by)
+  
+  # 1. Pivot data wide (Samples as rows, Assays as columns)
+  npx_wide <- data |>
+    dplyr::select(SampleID, OlinkID, NPX) |>
+    tidyr::pivot_wider(
+      names_from = OlinkID, 
+      values_from = NPX, 
+      values_fn = mean
+    ) |>
+    tibble::column_to_rownames("SampleID")
+  
+  # 2. Drop assays with any NA across samples
+  npx_wide_clean <- npx_wide[, colSums(is.na(npx_wide)) == 0]
+  n_assays <- ncol(npx_wide_clean)
+  
+  # 3. Compute PCA
+  pca_res <- prcomp(npx_wide_clean, scale. = TRUE)
+  var_explained <- summary(pca_res)$importance[2, 1:2] * 100
+  pc1_lab <- paste0("PC1 (", round(var_explained[1], 1), "%)")
+  pc2_lab <- paste0("PC2 (", round(var_explained[2], 1), "%)")
+  
+  # 4. Extract metadata & join PCA coordinates
+  meta_df <- data |>
+    dplyr::select(SampleID, Group, Experiment) |>
+    dplyr::distinct()
+  
+  pca_df <- as.data.frame(pca_res$x[, 1:2]) |>
+    tibble::rownames_to_column("SampleID") |>
+    dplyr::left_join(meta_df, by = "SampleID")
+  
+  # 5. Setup plot configuration based on coloring factor
+  if (color_by == "Group") {
+    p_color_aes <- aes(color = Group)
+    p_scale     <- scale_color_manual(values = custom_col5)
+    color_title <- "Experimental Group"
+  } else {
+    p_color_aes <- aes(color = Experiment)
+    p_scale     <- scale_color_manual(values = colors4)
+    color_title <- "Experiment Batch"
+  }
+  
+  # 6. Generate Plot
+  ggplot2::ggplot(pca_df, aes(x = PC1, y = PC2)) +
+    ggplot2::geom_point(p_color_aes, size = 4, alpha = 0.85) +
+    ggrepel::geom_text_repel(
+      aes(label = SampleID), 
+      size = 3, 
+      show.legend = FALSE, 
+      max.overlaps = 15
+    ) +
+    p_scale +
+    ggplot2::labs(
+      title = paste0("PCA: ", title_suffix),
+      subtitle = paste0("Based on ", n_assays, " NPX protein profiles"),
+      x = pc1_lab,
+      y = pc2_lab,
+      color = color_title
+    ) +
+    ggplot2::theme_bw(base_size = 12) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold", size = 12),
+      plot.subtitle = ggplot2::element_text(face = "italic", size = 10),
+      legend.position = "right",
+      panel.grid.minor = ggplot2::element_blank()
+    )
+}
+
+```
+
+# Set paths 
+
+```{r, warning = FALSE}
+data_path <- "/Users/sophiewagner/Desktop/USZ 25:26/Gabi_Project_Setup/Olink_Project/OLINK_Data/Result-X204SC26016367-Z01-F009-B1-43/1.Quant/pre_quant.csv"
+fixed_lod_path <- "/Users/sophiewagner/Desktop/USZ 25:26/Gabi_Project_Setup/Olink_Project/OLINK_Data/Gino Links/Reveal Fixed LOD - csv file.csv"
+
+
+# Visual Check: Display resolved paths in a table
+paths_df <- tibble::tibble(
+  File = c("Raw NPX File", "Fixed LOD File"),
+  Path = c(data_path, fixed_lod_path),
+  Exists = c(file.exists(data_path), file.exists(fixed_lod_path))
+)
+
+show_table(paths_df)
+
+
+custom_palette <- colorRampPalette(c("#005EA8", "#6DB335", "#FFD966", "#EDAAD2", "#9F1C67"))
+
+```
+
+# Import raw NPX
+
+```{r, warning = FALSE}
+npx_raw <- OlinkAnalyze::read_npx(
+  filename = data_path,
+  out_df = "tibble",
+  long_format = TRUE,
+  olink_platform = "Reveal",
+  data_type = "NPX",
+  quiet = FALSE
+)
+
+show_table(head(npx_raw, 10))
+
+```
+
+# Check warnings
+
+```{r, warning = FALSE}
+
+#### Sample Quality
+
+sample_counts <- npx_raw |>
+  dplyr::distinct(SampleID, SampleType, SampleQC)
+table(sample_counts$SampleQC)
+
+#### Assay Quality
+
+assay_counts <- npx_raw |>
+  dplyr::distinct(OlinkID, Assay, AssayQC)
+
+table(assay_counts$AssayQC)
+
+### Check on the 1 protein that was issued a warning
+
+warned_assay_info <- npx_raw |>
+  dplyr::filter(AssayQC == "WARN") |>
+  dplyr::distinct(OlinkID, Assay, Panel, AssayQC)
+
+warned_assay_info
+
+```
+
+# Import LOD Reference
+
+```{r, warning = FALSE}
+
+fixed_lod <- readr::read_delim(
+  file = fixed_lod_path,
+  delim = ";",
+  locale = readr::locale(decimal_mark = "."),
+  trim_ws = TRUE,
+  show_col_types = FALSE
+)
+
+# Only keep the proteins we used 
+
+required_ref_ids <- sort(unique(npx_raw$DataAnalysisRefID))
+
+fixed_lod_project <- fixed_lod |>
+  dplyr::filter(
+    DataAnalysisRefID %in% required_ref_ids,
+    AssayType == "assay"
+  )
+lod_method_summary <- fixed_lod_project |>
+  dplyr::count(DataAnalysisRefID, LODMethod, name = "Assay_Count")
+
+lod_method_summary
+
+#### check for dublicates
+
+lod_key <- c("OlinkID", "DataAnalysisRefID")
+
+duplicate_lod_defs <- fixed_lod_project |>
+  dplyr::count(dplyr::across(dplyr::all_of(lod_key)), name = "n_defs") |>
+  dplyr::filter(n_defs > 1)
+
+duplicate_lod_defs # no duplicates found
+
+#### Check if any proteins are missing 
+
+missing_lod_defs <- npx_raw |>
+  dplyr::filter(AssayType == "assay") |>
+  dplyr::distinct(dplyr::across(dplyr::all_of(lod_key))) |>
+  dplyr::anti_join(
+    fixed_lod_project |> dplyr::distinct(dplyr::across(dplyr::all_of(lod_key))),
+    by = lod_key
+  )
+
+missing_lod_defs # also 0
+```
+
+# Run check_npx
+
+```{r, warning = FALSE}
+
+npx_check <- OlinkAnalyze::check_npx(
+  df = npx_raw,
+  preferred_names = c("quant" = "NPX")
+)
+
+# check flagged assays
+warned_assays <- npx_raw |>
+  dplyr::filter(AssayQC == "WARN") |>
+  dplyr::count(OlinkID, Assay, AssayQC, name = "Flagged_Samples")
+
+warned_assays # still NPM1
+```
+
+# run clean_npx
+
+```{r, warning = FALSE}
+
+npx_pre_lod <- OlinkAnalyze::clean_npx(
+  df = npx_raw,
+  check_log = npx_check,
+  remove_control_assay = FALSE,
+  remove_control_sample = FALSE,
+  remove_assay_warning = FALSE,
+  remove_qc_warning = FALSE
+)
+
+# check if total dimensions remained unchanged 
+dim_check <- tibble::tibble(
+  Stage = c("Imported Raw Data", "Pre-LOD Cleaned Data"),
+  Rows = c(nrow(npx_raw), nrow(npx_pre_lod)),
+  Columns = c(ncol(npx_raw), ncol(npx_pre_lod))
+)
+dim_check # good
+```
+
+# integrate fixed LOD
+
+```{r, warning = FALSE}
+npx_pre_lod_check <- OlinkAnalyze::check_npx(
+  df = npx_pre_lod,
+  preferred_names = c("quant" = "NPX")
+)
+
+npx_with_lod <- OlinkAnalyze::olink_lod(
+  data = npx_pre_lod,
+  lod_method = "FixedLOD",
+  lod_file_path = fixed_lod_path,
+  check_log = npx_pre_lod_check
+)
+
+# Confirm addition of output columns (+2 new columns)
+post_lod_dim <- tibble::tibble(
+  Stage = c("Before olink_lod()", "After olink_lod()"),
+  Rows = c(nrow(npx_pre_lod), nrow(npx_with_lod)),
+  Columns = c(ncol(npx_pre_lod), ncol(npx_with_lod))
+)
+
+post_lod_dim # good
+```
+
+# Hybrid above-LOD classification (NPX and count)
+
+```{r, warning = FALSE}
+
+lod_lookup <- fixed_lod_project |>
+  dplyr::select(
+    dplyr::all_of(lod_key),
+    LODMethod,
+    FixedLODNPX_reference = LODNPX,
+    FixedLODCount_reference = LODCount
+  )
+
+npx_qc_full <- npx_with_lod |>
+  dplyr::left_join(lod_lookup, by = lod_key, relationship = "many-to-one") |>
+  dplyr::mutate(
+    AboveLOD = dplyr::case_when(
+      AssayType == "assay" & LODMethod == "lod_npx" & !is.na(NPX) & !is.na(LOD) ~ NPX > LOD,
+      AssayType == "assay" & LODMethod == "lod_count" & !is.na(Count) & !is.na(FixedLODCount_reference) ~ Count > FixedLODCount_reference,
+      TRUE ~ NA
+    )
+  )
+
+# Visual Check: Classification summary breakdown
+classification_summary <- npx_qc_full |>
+  dplyr::filter(AssayType == "assay") |>
+  dplyr::count(LODMethod, AboveLOD, name = "Observation_Count")
+
+```
+
+
+
+```{r,warning = FALSE, fig.width=8, fig.height=6}
+
+###### Assay detection rates overall
+
+detection_rates <- npx_qc_full |>
+  dplyr::filter(AssayType == "assay", SampleType == "SAMPLE") |>
+  dplyr::group_by(Assay, OlinkID, LODMethod) |>
+  dplyr::summarise(
+    percent_above_lod = mean(AboveLOD, na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+
+show_table(detection_rates)
+
+# Visual Check: Histogram distribution of assay detection percentages
+ggplot2::ggplot(detection_rates, aes(x = percent_above_lod, fill = LODMethod)) +
+  ggplot2::geom_histogram(binwidth = 5, color = "black", alpha = 0.8, position = "stack") +
+  ggplot2::scale_fill_manual(values = c("lod_npx" = "#005EA8", "lod_count" = "#6DB335")) +
+  ggplot2::theme_minimal() +
+  ggplot2::labs(
+    title = "Overall Protein Detection Rates Across Biological Samples",
+    x = "Percent of Samples Above LOD (%)",
+    y = "Number of Protein Assays",
+    fill = "LOD Method"
+  )
+
+```
+
+# percent over LOD per sample
+
+```{r,warning = FALSE, fig.width=6, fig.height=10}
+
+lod_summary <- npx_qc_full |>
+  dplyr::filter(AssayType == "assay") |>
+  dplyr::group_by(SampleID) |>
+  dplyr::summarise(
+    n_above_LOD    = sum(AboveLOD == TRUE, na.rm = TRUE),
+    n_total        = sum(!is.na(AboveLOD)),
+    frac_above_LOD = n_above_LOD / n_total,
+    Matrix         = if ("Matrix" %in% names(npx_qc_full)) dplyr::first(Matrix) else dplyr::first(SampleType),
+    .groups        = "drop"
+  )
+
+colornum <- length(unique(lod_summary$Matrix))
+selected_colors <- custom_palette(colornum)
+
+ggplot2::ggplot(lod_summary,
+       aes(x = reorder(SampleID, frac_above_LOD),
+           y = frac_above_LOD,
+           fill = Matrix)) +
+  ggplot2::geom_col() +
+  ggplot2::coord_flip() +
+  ggplot2::geom_text(
+    aes(
+      label = n_above_LOD,
+      y = frac_above_LOD + 0.03
+    ),
+    size = 2.8
+  ) +
+  ggplot2::scale_y_continuous(
+    limits = c(0, 1.15), 
+    labels = scales::percent_format()
+  ) +
+  ggplot2::scale_fill_manual(values = selected_colors) +
+  ggplot2::labs(
+    title = "Protein Detection Rates per Sample",
+    x     = "Sample",
+    y     = "Fraction of proteins above LOD",
+    fill  = "Matrix type"
+  ) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    axis.text.y = ggplot2::element_text(size = 6),
+    plot.title  = ggplot2::element_text( size = 11)
+  )
+
+
+```
+
+
+# Distance to LOD per sample
+
+```{r,warning = FALSE, fig.width=6, fig.height=10}
+
+npx_lod_dist <- npx_qc_full |>
+  dplyr::filter(AssayType == "assay") |>
+  dplyr::mutate(
+    lod_dist = NPX - LOD,
+    Matrix   = if ("Matrix" %in% names(npx_qc_full)) Matrix else SampleType
+  )
+
+sample_order <- npx_lod_dist |>
+  dplyr::group_by(SampleID) |>
+  dplyr::summarise(median_lod_dist = median(lod_dist, na.rm = TRUE), .groups = "drop") |>
+  dplyr::arrange(median_lod_dist) |>
+  dplyr::pull(SampleID)
+
+npx_lod_dist$SampleID <- factor(npx_lod_dist$SampleID, levels = sample_order)
+
+ggplot2::ggplot(npx_lod_dist,
+       aes(x    = SampleID,
+           y    = lod_dist,
+           fill = Matrix)) +
+  ggplot2::geom_boxplot(outlier.size = 0.3, alpha = 0.85, outlier.alpha = 0.5) +
+  ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "darkred", linewidth = 0.6) +
+  ggplot2::coord_flip() +
+  ggplot2::scale_fill_manual(values = selected_colors) +
+  ggplot2::labs(
+    title = "Signal Distance to LOD (NPX - LOD) per Sample",
+    x     = "Sample",
+    y     = "Distance to LOD (NPX – LOD)",
+    fill  = "Matrix type"
+  ) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    axis.text.y = ggplot2::element_text(size = 6),
+    plot.title  = ggplot2::element_text(size = 11)
+  )
+
+```
+
+
+# Subset the samples of interes
+
+```{r, warning = FALSE}
+
+samples_to_keep <- c(
+  # --- 1. MTs control ---
+  "EX1_Con1_NC",   # Row 1:  EX1 Cont. 1 NC
+  "EX1_Con2_NC",   # Row 2:  EX1 Cont. 2 NC  
+  "EX2_Con1_NC",   # Row 3:  EX2 Cont. 1 NC
+  "EX2_Con2_NC",   # Row 4:  EX2 Cont. 2 NC
+  "EX3_Cont_NC",   # Row 5:  EX3 Cont. NC
+
+  # --- 2. MTs TGFb ---
+  "EX1_Con1_TGF",    # Row 6:  EX1 Cont. 1 TGF
+  "EX1_Cont_2_TGF",  # Row 7:  EX1 Cont. 2 TGF
+  "EX2_Con1_TGF",    # Row 8:  EX2 Cont. 1 TGF
+  "EX2_Con2_TGF",    # Row 9:  EX2 Cont. 2 TGF
+  "EX3_Cont_TGF",    # Row 10: EX3 Cont. TGF
+
+  # --- 3. MTs control + healthy macrophages  ---
+  "EX1_H_NC",   # Row 11: EX1 H NC
+  "EX2_H_NC",   # Row 12: EX2 H NC
+  "EX3_H1_NC",  # Row 13: EX3 H1 NC
+  "EX3_H2_NC",  # Row 14: EX3 H2 NC
+  "EX4_H1_NC",  # Row 15: EX4 H1 NC
+  "EX4_H2_NC",  # Row 16: EX4 H2 NC
+
+  # --- 4. MTs TGFb + healthy macrophages ---
+  "EX1_H_TGF",   # Row 17: EX1 H TGF
+  "EX2_H_TGF",   # Row 18: EX2 H TGF
+  "EX3_H1_TGF",  # Row 19: EX3 H1 TGF
+  "EX3_H2_TGF",  # Row 20: EX3 H2 TGF
+  "EX4_H1_TGF",  # Row 21: EX4 H1 TGF
+  "EX4_H2_TGF"  # Row 22: EX4 H2 TGF
+
+  # --- 7. Media Controls ---
+  #"HSM",        # Row 35: Heart standard medium
+  #"MM_medium"   # Maintenance Medium
+)
+
+if (length(samples_to_keep) > 0) {
+  npx_qc_subset <- npx_qc_full |>
+    dplyr::filter(SampleType == "SAMPLE", SampleID %in% samples_to_keep)
+} else {
+  npx_qc_subset <- npx_qc_full |>
+    dplyr::filter(SampleType == "SAMPLE")
+}
+
+# Visual Check: Verify subset size
+subset_info <- tibble::tibble(
+  Dataset = c("Full Plate (Biological)", "Filtered Cohort Subset"),
+  Samples = c(
+    dplyr::n_distinct(npx_qc_full$SampleID[npx_qc_full$SampleType == "SAMPLE"]),
+    dplyr::n_distinct(npx_qc_subset$SampleID)
+  ),
+  Total_Observations = c(nrow(npx_qc_full[npx_qc_full$SampleType == "SAMPLE", ]), nrow(npx_qc_subset))
+)
+
+subset_info
+
+```
+
+# adding metadata
+
+```{r, warning = FALSE}
+
+npx_qc_pca_data <- npx_qc_subset |>
+  dplyr::mutate(
+    Experiment = dplyr::case_when(
+      stringr::str_detect(SampleID, "^EX1") ~ "EX1",
+      stringr::str_detect(SampleID, "^EX2") ~ "EX2",
+      stringr::str_detect(SampleID, "^EX3") ~ "EX3",
+      stringr::str_detect(SampleID, "^EX4") ~ "EX4",
+      TRUE ~ "Media"
+    ),
+    Experiment = factor(Experiment),
+    
+    # Define experimental groups
+    Group = dplyr::case_when(
+      SampleID %in% c("HSM", "MM_medium") ~ "Media Control",
+      stringr::str_detect(SampleID, "_NC$") & stringr::str_detect(SampleID, "_H") ~ "MT + Macrophages (NC)",
+      stringr::str_detect(SampleID, "_TGF$") & stringr::str_detect(SampleID, "_H") ~ "MT + Macrophages (TGFb)",
+      stringr::str_detect(SampleID, "_NC$") ~ "MT Control (NC)",
+      stringr::str_detect(SampleID, "_TGF$") ~ "MT Control (TGFb)",
+      TRUE ~ "Other"
+    ),
+    Group = factor(Group, levels = c(
+      "MT Control (NC)", 
+      "MT Control (TGFb)", 
+      "MT + Macrophages (NC)", 
+      "MT + Macrophages (TGFb)", 
+      "Media Control"
+    ))
+  )
+
+```
+
+
+# IQR - mNPX
+
+```{r, warning = FALSE}
+
+colors4 <- custom_palette(4)
+
+# 1. Calculate Median and IQR per sample across all measured assays
+sample_stats <- npx_qc_pca_data |>
+  dplyr::group_by(SampleID, Experiment) |>
+  dplyr::summarise(
+    median_npx = median(NPX, na.rm = TRUE),
+    iqr_npx = IQR(NPX, na.rm = TRUE),
+    pct_above_lod = mean(AboveLOD == TRUE, na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+
+# 2. Plot Per-Sample Median vs. IQR colored by Experiment
+ggplot2::ggplot(sample_stats, aes(x = median_npx, y = iqr_npx, color = Experiment)) +
+  ggplot2::geom_point(size = 4, alpha = 0.9) +
+  ggrepel::geom_text_repel(
+    aes(label = SampleID), 
+    size = 3.2, 
+    show.legend = FALSE, 
+    max.overlaps = 15,
+    box.padding = 0.3
+  ) +
+  ggplot2::scale_color_manual(values = colors4) +
+  ggplot2::labs(
+    title = "Batch Effect Check: Per-Sample Median NPX vs. IQR",
+    subtitle = "Assess technical shifts and signal distributions across experiment batches",
+    x = "Median NPX per Sample",
+    y = "Interquartile Range (IQR) per Sample",
+    color = "Experiment Batch"
+  ) +
+  ggplot2::theme_minimal(base_size = 12) +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(face = "bold"),
+    panel.grid.minor = ggplot2::element_blank()
+  )
+
+
+```
+
+
+# Check detection rate
+
+```{r, warning = FALSE}
+
+# Standardize to biological samples only
+bio_samples <- npx_qc_pca_data |>
+  dplyr::filter(AssayType == "assay", SampleType == "SAMPLE")
+
+
+# Per-Protein Detection Histogram ---
+protein_detection <- bio_samples |>
+  dplyr::group_by(OlinkID, Assay) |>
+  dplyr::summarise(
+    pct_above_lod = mean(AboveLOD, na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+
+ggplot2::ggplot(protein_detection, aes(x = pct_above_lod)) +
+  ggplot2::geom_histogram(binwidth = 5, fill = "#005EA8", color = "white", boundary = 0) +
+  ggplot2::geom_vline(xintercept = 25, linetype = "dashed", color = "darkred", linewidth = 0.8) +
+  ggplot2::annotate("text", x = 52, y = Inf, label = "25% Cutoff", vjust = 2, hjust = 0, color = "darkred", fontface = "bold") +
+  ggplot2::scale_x_continuous(limits = c(0, 105), breaks = seq(0, 100, by = 10)) +
+  ggplot2::labs(
+    title = "Distribution of Protein Detection Rates Across Samples",
+    subtitle = "Percentage of biological samples with signal > LOD per protein assay",
+    x = "Detection Rate per Protein (% above LOD)",
+    y = "Number of Protein Assays"
+  ) +
+  ggplot2::theme_minimal(base_size = 12) +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(face = "bold"),
+    panel.grid.minor = ggplot2::element_blank()
+  )
+
+
+# Per-Sample Detection Histogram ---
+
+sample_detection <- bio_samples |>
+  dplyr::group_by(SampleID, Group) |>
+  dplyr::summarise(
+    pct_above_lod = mean(AboveLOD, na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+
+ggplot2::ggplot(sample_detection, aes(x = pct_above_lod)) +
+  ggplot2::geom_histogram(binwidth = 2, fill = "#6DB335", color = "white", boundary = 0) +
+  ggplot2::scale_x_continuous(limits = c(0, 105), breaks = seq(0, 100, by = 10)) +
+  ggplot2::labs(
+    title = "Distribution of Sample Detection Rates Across Assays",
+    subtitle = "Percentage of protein assays detected per individual sample",
+    x = "Detection Rate per Sample (% proteins above LOD)",
+    y = "Number of Samples"
+  ) +
+  ggplot2::theme_minimal(base_size = 12) +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(face = "bold"),
+    panel.grid.minor = ggplot2::element_blank()
+  )
+
+########################################################
+
+npx_lod_dist <- bio_samples |>
+  dplyr::mutate(lod_dist = NPX - LOD)
+
+# Set sample order
+sample_order <- sort(unique(npx_lod_dist$SampleID))
+npx_lod_dist$SampleID <- factor(npx_lod_dist$SampleID, levels = sample_order)
+
+# Generate Boxplot
+ggplot2::ggplot(npx_lod_dist,
+       aes(x    = SampleID,
+           y    = lod_dist,
+           fill = Experiment)) +
+  ggplot2::geom_boxplot(outlier.size = 0.3, alpha = 0.85, outlier.alpha = 0.5) +
+  ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "darkred", linewidth = 0.6) +
+  ggplot2::coord_flip() +
+  ggplot2::scale_fill_manual(values = colors4) +
+  ggplot2::labs(
+    title = "Signal Distance to LOD (NPX - LOD) per Sample",
+    subtitle = "Dashed line at 0 marks the Limit of Detection (LOD)",
+    x     = "Sample",
+    y     = "Distance to LOD (NPX – LOD)",
+    fill  = "Experiment Batch"
+  ) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    axis.text.y = ggplot2::element_text(size = 7),
+    plot.title  = ggplot2::element_text(size = 11, face = "bold")
+  )
+
+##############################################
+
+
+# 1. Ensure lod_dist is calculated
+bio_samples <- bio_samples |>
+  dplyr::mutate(lod_dist = NPX - LOD)
+
+# 2. Plot Distance to LOD grouped by Experimental Group
+ggplot2::ggplot(bio_samples, aes(x = Group, y = lod_dist, fill = Group)) +
+  ggplot2::geom_boxplot(outlier.size = 0.3, alpha = 0.85, outlier.alpha = 0.5) +
+  ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "darkred", linewidth = 0.8) +
+  ggplot2::coord_flip() +
+  ggplot2::scale_fill_brewer(palette = "Set2") +
+  ggplot2::labs(
+    title = "Signal Distance to LOD (NPX - LOD) per Condition",
+    subtitle = "Dashed line at 0 marks the Limit of Detection (LOD)",
+    x = "Experimental Condition",
+    y = "Distance to LOD (NPX - LOD)",
+    fill = "Condition"
+  ) +
+  ggplot2::theme_bw(base_size = 12) +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+
+######################## hybrid filtering 
+
+# per-protein metrics on biological samples
+protein_metrics <- bio_samples |>
+  dplyr::group_by(OlinkID, Assay) |>
+  dplyr::summarise(
+    n_above_lod = sum(AboveLOD == TRUE, na.rm = TRUE),
+    iqr_val     = IQR(NPX, na.rm = TRUE),
+    .groups     = "drop"
+  )
+
+# Define IQR threshold 
+iqr_threshold <- median(protein_metrics$iqr_val, na.rm = TRUE)
+
+# Identify proteins passing AT LEAST ONE rule
+keep_hybrid_proteins <- protein_metrics |>
+  dplyr::filter(n_above_lod >= 2 | iqr_val >= iqr_threshold) |>
+  dplyr::pull(OlinkID) |>
+  unique()
+
+# Filter the primary biological dataset
+npx_filtered <- bio_samples |>
+  dplyr::filter(OlinkID %in% keep_hybrid_proteins)
+
+# Diagnostic Summary
+total_assays    <- dplyr::n_distinct(bio_samples$OlinkID)
+retained_hybrid <- length(keep_hybrid_proteins)
+
+cat(sprintf(
+  "=== Hybrid Protein Detection Filtering Summary ===\nTotal assays evaluated: %d\nRetained assays (n_above_lod >= 2 OR IQR >= %.3f): %d (%.1f%%)\nDropped assays: %d (%.1f%%)\n",
+  total_assays,
+  iqr_threshold,
+  retained_hybrid, (retained_hybrid / total_assays) * 100,
+  total_assays - retained_hybrid, ((total_assays - retained_hybrid) / total_assays) * 100
+))
+
+```  
+
+# generate PCAs
+
+```{r, warning = FALSE}
+
+custom_col5 <- custom_palette(5)
+colors4     <- custom_palette(4)
+
+
+# Unfiltered - Colored by Group
+p_unfiltered_group <- plot_pca_dataset(
+  data = npx_qc_pca_data, 
+  color_by = "Group", 
+  title_suffix = "Unfiltered Dataset (Colored by Condition)"
+)
+
+# Unfiltered - Colored by Experiment Batch
+p_unfiltered_exp <- plot_pca_dataset(
+  data = npx_qc_pca_data, 
+  color_by = "Experiment", 
+  title_suffix = "Unfiltered Dataset (Colored by Batch)"
+)
+
+# Filtered (Hybrid) - Colored by Group
+p_filtered_group <- plot_pca_dataset(
+  data = npx_filtered, 
+  color_by = "Group", 
+  title_suffix = "Hybrid Filtered Dataset (Colored by Condition)"
+)
+
+# Filtered (Hybrid) - Colored by Experiment Batch
+p_filtered_exp <- plot_pca_dataset(
+  data = npx_filtered, 
+  color_by = "Experiment", 
+  title_suffix = "Hybrid Filtered Dataset (Colored by Batch)"
+)
+
+# Render plots
+p_filtered_group
+p_filtered_exp
+
+# Render plots
+p_unfiltered_group
+p_unfiltered_exp
+```
+
+# DPEA with limma
+
+```{r, warning = FALSE}
+
+# clean_meta <- npx_qc_pca_data |> 
+#   dplyr::select(SampleID, Group, Experiment) |> 
+#   dplyr::distinct() |> 
+#   dplyr::filter(Group != "Other", Group != "Media Control") 
+# 
+# clean_meta$Group <- factor(clean_meta$Group, levels = c(
+#   "MT Control (NC)", 
+#   "MT Control (TGFb)", 
+#   "MT + Macrophages (NC)", 
+#   "MT + Macrophages (TGFb)"
+# ))
+# 
+# design <- model.matrix(~ 0 + Group + Experiment, data = clean_meta)
+# colnames(design) <- make.names(colnames(design))
+# 
+# # Prepare NPX Expression Matrix ---
+# npx_matrix <- npx_qc_pca_data |>
+#   dplyr::filter(SampleID %in% clean_meta$SampleID) |>
+#   dplyr::select(SampleID, Assay, NPX) |>
+#   tidyr::pivot_wider(names_from = SampleID, values_from = NPX) |>
+#   column_to_rownames("Assay") |>
+#   as.matrix()
+# 
+# npx_matrix <- npx_matrix[, clean_meta$SampleID]
+# 
+# # Fit Linear Model ---
+# fit <- lmFit(npx_matrix, design)
+# 
+# # Define Specific Contrasts ---
+# contrast_matrix <- makeContrasts(
+#   # 1. CMF_TGF vs CMF_NC (Effect of TGFb in MTs alone)
+#   Contrast1_CMFTGF_vs_CMFNC = GroupMT.Control..TGFb. - GroupMT.Control..NC.,
+#   # 2. CMFHM_NC vs CMF_NC (Effect of Healthy Macrophages baseline)
+#   Contrast2_CMFHMNC_vs_CMFNC = GroupMT...Macrophages..NC. - GroupMT.Control..NC.,
+#   # 3. CMFHM_TGF vs CMFHM_NC (Effect of TGFb in co-culture)
+#   Contrast3_CMFHMTGF_vs_CMFHMNC = GroupMT...Macrophages..TGFb. - GroupMT...Macrophages..NC.,
+#   # 4. CMFHM_TGF vs CMF_TGF (Effect of Healthy Macrophages under TGFb)
+#   Contrast4_CMFHMTGF_vs_CMFTGF = GroupMT...Macrophages..TGFb. - GroupMT.Control..TGFb.,
+#   levels = design
+# )
+# 
+# # Fit Contrasts & Empirical Bayes Moderation ---
+# fit_eb <- eBayes(contrasts.fit(fit, contrast_matrix))
+# 
+# # Extract Results Tables for All 4 Contrasts ---
+# res_contrast1 <- topTable(fit_eb, coef = "Contrast1_CMFTGF_vs_CMFNC", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
+# res_contrast2 <- topTable(fit_eb, coef = "Contrast2_CMFHMNC_vs_CMFNC", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
+# res_contrast3 <- topTable(fit_eb, coef = "Contrast3_CMFHMTGF_vs_CMFHMNC", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
+# res_contrast4 <- topTable(fit_eb, coef = "Contrast4_CMFHMTGF_vs_CMFTGF", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
+```
+
+```{r, warning = FALSE}
+
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
 
 ```
 
