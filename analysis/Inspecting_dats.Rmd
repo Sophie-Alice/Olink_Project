@@ -704,7 +704,7 @@ ggplot2::ggplot(bio_samples, aes(x = Group, y = lod_dist, fill = Group)) +
   ggplot2::geom_boxplot(outlier.size = 0.3, alpha = 0.85, outlier.alpha = 0.5) +
   ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "darkred", linewidth = 0.8) +
   ggplot2::coord_flip() +
-  ggplot2::scale_fill_brewer(palette = "Set2") +
+  ggplot2::scale_fill_manual(values = colors4) +
   ggplot2::labs(
     title = "Signal Distance to LOD (NPX - LOD) per Condition",
     subtitle = "Dashed line at 0 marks the Limit of Detection (LOD)",
@@ -794,12 +794,13 @@ p_filtered_exp <- plot_pca_dataset(
 )
 
 # Render plots
+p_unfiltered_group
+p_unfiltered_exp
+
+# Render plots
 p_filtered_group
 p_filtered_exp
 
-# Render plots
-p_unfiltered_group
-p_unfiltered_exp
 ```
 
 # DPEA with limma
