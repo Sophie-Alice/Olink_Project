@@ -411,7 +411,7 @@ class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2026-07-22
+<strong>Last updated:</strong> 2026-07-23
 </p>
 <p>
 <strong>Checks:</strong> <span
@@ -542,15 +542,15 @@ project makes it easier to run your code on other machines.</p>
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomSophieAliceOlinkProjecttree668acc7bb2d3c8acfe1101e4626e2e7e94fa4e7dtargetblank668acc7a">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomSophieAliceOlinkProjecttree8352fabd578d94f36bb77aa0d58d89cc479b50fetargetblank8352faba">
 <span class="glyphicon glyphicon-ok text-success"
 aria-hidden="true"></span> <strong>Repository version:</strong>
-<a href="https://github.com/Sophie-Alice/Olink_Project/tree/668acc7bb2d3c8acfe1101e4626e2e7e94fa4e7d" target="_blank">668acc7</a>
+<a href="https://github.com/Sophie-Alice/Olink_Project/tree/8352fabd578d94f36bb77aa0d58d89cc479b50fe" target="_blank">8352fab</a>
 </a>
 </p>
 </div>
 <div
-id="strongRepositoryversionstrongahrefhttpsgithubcomSophieAliceOlinkProjecttree668acc7bb2d3c8acfe1101e4626e2e7e94fa4e7dtargetblank668acc7a"
+id="strongRepositoryversionstrongahrefhttpsgithubcomSophieAliceOlinkProjecttree8352fabd578d94f36bb77aa0d58d89cc479b50fetargetblank8352faba"
 class="panel-collapse collapse">
 <div class="panel-body">
 <p>
@@ -560,7 +560,7 @@ reproducibility.
 </p>
 <p>
 The results in this page were generated with repository version
-<a href="https://github.com/Sophie-Alice/Olink_Project/tree/668acc7bb2d3c8acfe1101e4626e2e7e94fa4e7d" target="_blank">668acc7</a>.
+<a href="https://github.com/Sophie-Alice/Olink_Project/tree/8352fabd578d94f36bb77aa0d58d89cc479b50fe" target="_blank">8352fab</a>.
 See the <em>Past versions</em> tab to see a history of the changes made
 to the R Markdown and HTML files.
 </p>
@@ -621,6 +621,40 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/Sophie-Alice/Olink_Project/blob/8352fabd578d94f36bb77aa0d58d89cc479b50fe/analysis/Inspecting_dats.Rmd" target="_blank">8352fab</a>
+</td>
+<td>
+Sophie.Alice
+</td>
+<td>
+2026-07-23
+</td>
+<td>
+Trying some ORA
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/Sophie-Alice/Olink_Project/07ce6e351c30f0c93309d2789116bfd3e56ca465/docs/Inspecting_dats.html" target="_blank">07ce6e3</a>
+</td>
+<td>
+Sophie.Alice
+</td>
+<td>
+2026-07-22
+</td>
+<td>
+Build site.
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -718,8 +752,8 @@ Publish the initial files for myproject
 <pre class="r"><code>rm(list = ls())
 gc()</code></pre>
 <pre><code>          used (Mb) gc trigger (Mb) limit (Mb) max used (Mb)
-Ncells  908312 48.6    1754317 93.7         NA  1321070 70.6
-Vcells 1602497 12.3    8388608 64.0      16384  2535556 19.4</code></pre>
+Ncells  907924 48.5    1753211 93.7         NA  1321067 70.6
+Vcells 1601263 12.3    8388608 64.0      16384  2473638 18.9</code></pre>
 <pre class="r"><code>library(here)
 library(dplyr)
 library(readr)
@@ -737,7 +771,6 @@ library(ggrepel)</code></pre>
 <h1>Functions</h1>
 <pre class="r"><code>##################################### Tables
 
-library(DT)
 show_table &lt;- function(df) {
   DT::datatable(
     df,
@@ -954,7 +987,7 @@ missing_lod_defs # also 0</code></pre>
   preferred_names = c(&quot;quant&quot; = &quot;NPX&quot;)
 )</code></pre>
 <pre><code>duckdb is keeping downloaded extensions in a temporary directory:
-ℹ /var/folders/4w/_9gjjltx7r7__536sy6dcwbw0000gn/T//RtmpUjKDi1/duckdb/extensions
+ℹ /var/folders/4w/_9gjjltx7r7__536sy6dcwbw0000gn/T//RtmpFaAUY3/duckdb/extensions
 This is removed when the R session ends, so extensions are re-downloaded each session.
 ℹ To keep them, point `options(duckdb.extension_directory =)` or the `DUCKDB_EXTENSION_DIRECTORY` environment variable at a permanent path.
 1 assay exhibited assay QC warnings in column `AssayQC` of the dataset:
@@ -1403,7 +1436,7 @@ ggplot2::ggplot(sample_stats, aes(x = median_npx, y = iqr_npx, color = Experimen
     plot.title = ggplot2::element_text(face = &quot;bold&quot;),
     panel.grid.minor = ggplot2::element_blank()
   )</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-16-1.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-16-1.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-16-1">
 Past versions of unnamed-chunk-16-1.png
@@ -1458,9 +1491,8 @@ protein_detection &lt;- bio_samples |&gt;
   )
 
 ggplot2::ggplot(protein_detection, aes(x = pct_above_lod)) +
-  ggplot2::geom_histogram(binwidth = 5, fill = &quot;#005EA8&quot;, color = &quot;white&quot;, boundary = 0) +
+  ggplot2::geom_histogram(binwidth = 10, fill = &quot;#005EA8&quot;, color = &quot;white&quot;, boundary = 0) +
   ggplot2::geom_vline(xintercept = 25, linetype = &quot;dashed&quot;, color = &quot;darkred&quot;, linewidth = 0.8) +
-  ggplot2::annotate(&quot;text&quot;, x = 52, y = Inf, label = &quot;25% Cutoff&quot;, vjust = 2, hjust = 0, color = &quot;darkred&quot;, fontface = &quot;bold&quot;) +
   ggplot2::scale_x_continuous(limits = c(0, 105), breaks = seq(0, 100, by = 10)) +
   ggplot2::labs(
     title = &quot;Distribution of Protein Detection Rates Across Samples&quot;,
@@ -1473,7 +1505,7 @@ ggplot2::ggplot(protein_detection, aes(x = pct_above_lod)) +
     plot.title = ggplot2::element_text(face = &quot;bold&quot;),
     panel.grid.minor = ggplot2::element_blank()
   )</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-1.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-1.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-17-1">
 Past versions of unnamed-chunk-17-1.png
@@ -1534,7 +1566,7 @@ ggplot2::ggplot(sample_detection, aes(x = pct_above_lod)) +
     plot.title = ggplot2::element_text(face = &quot;bold&quot;),
     panel.grid.minor = ggplot2::element_blank()
   )</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-2.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-2.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-17-2">
 Past versions of unnamed-chunk-17-2.png
@@ -1602,7 +1634,7 @@ ggplot2::ggplot(npx_lod_dist,
     axis.text.y = ggplot2::element_text(size = 7),
     plot.title  = ggplot2::element_text(size = 11, face = &quot;bold&quot;)
   )</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-3.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-3.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-17-3">
 Past versions of unnamed-chunk-17-3.png
@@ -1643,11 +1675,11 @@ Sophie.Alice
 <pre class="r"><code>##############################################
 
 
-# 1. Ensure lod_dist is calculated
+# Ensure lod_dist is calculated
 bio_samples &lt;- bio_samples |&gt;
   dplyr::mutate(lod_dist = NPX - LOD)
 
-# 2. Plot Distance to LOD grouped by Experimental Group
+# Plot Distance to LOD grouped by Experimental Group
 ggplot2::ggplot(bio_samples, aes(x = Group, y = lod_dist, fill = Group)) +
   ggplot2::geom_boxplot(outlier.size = 0.3, alpha = 0.85, outlier.alpha = 0.5) +
   ggplot2::geom_hline(yintercept = 0, linetype = &quot;dashed&quot;, color = &quot;darkred&quot;, linewidth = 0.8) +
@@ -1665,7 +1697,7 @@ ggplot2::ggplot(bio_samples, aes(x = Group, y = lod_dist, fill = Group)) +
     plot.title = ggplot2::element_text(face = &quot;bold&quot;),
     legend.position = &quot;none&quot;
   )</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-4.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-17-4.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-17-4">
 Past versions of unnamed-chunk-17-4.png
@@ -1688,6 +1720,17 @@ Date
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<a href="https://github.com/Sophie-Alice/Olink_Project/blob/07ce6e351c30f0c93309d2789116bfd3e56ca465/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-17-4.png" target="_blank">07ce6e3</a>
+</td>
+<td>
+Sophie.Alice
+</td>
+<td>
+2026-07-22
+</td>
+</tr>
 <tr>
 <td>
 <a href="https://github.com/Sophie-Alice/Olink_Project/blob/2d4dd52954a6aa658ac1538bf42541c9fe60a7d9/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-17-4.png" target="_blank">2d4dd52</a>
@@ -1779,7 +1822,7 @@ p_filtered_exp &lt;- plot_pca_dataset(
 
 # Render plots
 p_unfiltered_group</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-1.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-1.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-18-1">
 Past versions of unnamed-chunk-18-1.png
@@ -1804,6 +1847,17 @@ Date
 <tbody>
 <tr>
 <td>
+<a href="https://github.com/Sophie-Alice/Olink_Project/blob/07ce6e351c30f0c93309d2789116bfd3e56ca465/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-1.png" target="_blank">07ce6e3</a>
+</td>
+<td>
+Sophie.Alice
+</td>
+<td>
+2026-07-22
+</td>
+</tr>
+<tr>
+<td>
 <a href="https://github.com/Sophie-Alice/Olink_Project/blob/2d4dd52954a6aa658ac1538bf42541c9fe60a7d9/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-1.png" target="_blank">2d4dd52</a>
 </td>
 <td>
@@ -1818,7 +1872,7 @@ Sophie.Alice
 </div>
 </div>
 <pre class="r"><code>p_unfiltered_exp</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-2.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-2.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-18-2">
 Past versions of unnamed-chunk-18-2.png
@@ -1843,6 +1897,17 @@ Date
 <tbody>
 <tr>
 <td>
+<a href="https://github.com/Sophie-Alice/Olink_Project/blob/07ce6e351c30f0c93309d2789116bfd3e56ca465/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-2.png" target="_blank">07ce6e3</a>
+</td>
+<td>
+Sophie.Alice
+</td>
+<td>
+2026-07-22
+</td>
+</tr>
+<tr>
+<td>
 <a href="https://github.com/Sophie-Alice/Olink_Project/blob/2d4dd52954a6aa658ac1538bf42541c9fe60a7d9/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-2.png" target="_blank">2d4dd52</a>
 </td>
 <td>
@@ -1858,7 +1923,7 @@ Sophie.Alice
 </div>
 <pre class="r"><code># Render plots
 p_filtered_group</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-3.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-3.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-18-3">
 Past versions of unnamed-chunk-18-3.png
@@ -1883,6 +1948,17 @@ Date
 <tbody>
 <tr>
 <td>
+<a href="https://github.com/Sophie-Alice/Olink_Project/blob/07ce6e351c30f0c93309d2789116bfd3e56ca465/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-3.png" target="_blank">07ce6e3</a>
+</td>
+<td>
+Sophie.Alice
+</td>
+<td>
+2026-07-22
+</td>
+</tr>
+<tr>
+<td>
 <a href="https://github.com/Sophie-Alice/Olink_Project/blob/2d4dd52954a6aa658ac1538bf42541c9fe60a7d9/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-3.png" target="_blank">2d4dd52</a>
 </td>
 <td>
@@ -1897,7 +1973,7 @@ Sophie.Alice
 </div>
 </div>
 <pre class="r"><code>p_filtered_exp</code></pre>
-<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-4.png" alt="" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/Inspecting_dats.Rmd/unnamed-chunk-18-4.png" alt="" width="768" style="display: block; margin: auto;" /></p>
 <p>
 <button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-18-4">
 Past versions of unnamed-chunk-18-4.png
@@ -1922,6 +1998,17 @@ Date
 <tbody>
 <tr>
 <td>
+<a href="https://github.com/Sophie-Alice/Olink_Project/blob/07ce6e351c30f0c93309d2789116bfd3e56ca465/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-4.png" target="_blank">07ce6e3</a>
+</td>
+<td>
+Sophie.Alice
+</td>
+<td>
+2026-07-22
+</td>
+</tr>
+<tr>
+<td>
 <a href="https://github.com/Sophie-Alice/Olink_Project/blob/2d4dd52954a6aa658ac1538bf42541c9fe60a7d9/docs/figure/Inspecting_dats.Rmd/unnamed-chunk-18-4.png" target="_blank">2d4dd52</a>
 </td>
 <td>
@@ -1935,58 +2022,10 @@ Sophie.Alice
 </table>
 </div>
 </div>
-</div>
-<div id="dpea-with-limma" class="section level1">
-<h1>DPEA with limma</h1>
-<pre class="r"><code># clean_meta &lt;- npx_qc_pca_data |&gt; 
-#   dplyr::select(SampleID, Group, Experiment) |&gt; 
-#   dplyr::distinct() |&gt; 
-#   dplyr::filter(Group != &quot;Other&quot;, Group != &quot;Media Control&quot;) 
-# 
-# clean_meta$Group &lt;- factor(clean_meta$Group, levels = c(
-#   &quot;MT Control (NC)&quot;, 
-#   &quot;MT Control (TGFb)&quot;, 
-#   &quot;MT + Macrophages (NC)&quot;, 
-#   &quot;MT + Macrophages (TGFb)&quot;
-# ))
-# 
-# design &lt;- model.matrix(~ 0 + Group + Experiment, data = clean_meta)
-# colnames(design) &lt;- make.names(colnames(design))
-# 
-# # Prepare NPX Expression Matrix ---
-# npx_matrix &lt;- npx_qc_pca_data |&gt;
-#   dplyr::filter(SampleID %in% clean_meta$SampleID) |&gt;
-#   dplyr::select(SampleID, Assay, NPX) |&gt;
-#   tidyr::pivot_wider(names_from = SampleID, values_from = NPX) |&gt;
-#   column_to_rownames(&quot;Assay&quot;) |&gt;
-#   as.matrix()
-# 
-# npx_matrix &lt;- npx_matrix[, clean_meta$SampleID]
-# 
-# # Fit Linear Model ---
-# fit &lt;- lmFit(npx_matrix, design)
-# 
-# # Define Specific Contrasts ---
-# contrast_matrix &lt;- makeContrasts(
-#   # 1. CMF_TGF vs CMF_NC (Effect of TGFb in MTs alone)
-#   Contrast1_CMFTGF_vs_CMFNC = GroupMT.Control..TGFb. - GroupMT.Control..NC.,
-#   # 2. CMFHM_NC vs CMF_NC (Effect of Healthy Macrophages baseline)
-#   Contrast2_CMFHMNC_vs_CMFNC = GroupMT...Macrophages..NC. - GroupMT.Control..NC.,
-#   # 3. CMFHM_TGF vs CMFHM_NC (Effect of TGFb in co-culture)
-#   Contrast3_CMFHMTGF_vs_CMFHMNC = GroupMT...Macrophages..TGFb. - GroupMT...Macrophages..NC.,
-#   # 4. CMFHM_TGF vs CMF_TGF (Effect of Healthy Macrophages under TGFb)
-#   Contrast4_CMFHMTGF_vs_CMFTGF = GroupMT...Macrophages..TGFb. - GroupMT.Control..TGFb.,
-#   levels = design
-# )
-# 
-# # Fit Contrasts &amp; Empirical Bayes Moderation ---
-# fit_eb &lt;- eBayes(contrasts.fit(fit, contrast_matrix))
-# 
-# # Extract Results Tables for All 4 Contrasts ---
-# res_contrast1 &lt;- topTable(fit_eb, coef = &quot;Contrast1_CMFTGF_vs_CMFNC&quot;, number = Inf, adjust.method = &quot;BH&quot;) |&gt; rownames_to_column(&quot;Assay&quot;)
-# res_contrast2 &lt;- topTable(fit_eb, coef = &quot;Contrast2_CMFHMNC_vs_CMFNC&quot;, number = Inf, adjust.method = &quot;BH&quot;) |&gt; rownames_to_column(&quot;Assay&quot;)
-# res_contrast3 &lt;- topTable(fit_eb, coef = &quot;Contrast3_CMFHMTGF_vs_CMFHMNC&quot;, number = Inf, adjust.method = &quot;BH&quot;) |&gt; rownames_to_column(&quot;Assay&quot;)
-# res_contrast4 &lt;- topTable(fit_eb, coef = &quot;Contrast4_CMFHMTGF_vs_CMFTGF&quot;, number = Inf, adjust.method = &quot;BH&quot;) |&gt; rownames_to_column(&quot;Assay&quot;)</code></pre>
+<pre class="r"><code>outputdir &lt;- &quot;/Users/sophiewagner/Desktop/USZ 25:26/Gabi_Project_Setup/Olink_Project/OLINK_Data/RDSFiles&quot;
+
+saveRDS(npx_qc_pca_data, file = file.path(outputdir, &quot;unfiltered_NPXs_annot.rds&quot;))
+saveRDS(npx_filtered, file = file.path(outputdir, &quot;filtered_NPXs_annot.rds&quot;))</code></pre>
 <br>
 <p>
 <button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
