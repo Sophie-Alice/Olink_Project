@@ -35,7 +35,6 @@ library(ggrepel)
 
 ##################################### Tables
 
-library(DT)
 show_table <- function(df) {
   DT::datatable(
     df,
@@ -560,7 +559,7 @@ npx_qc_pca_data <- npx_qc_subset |>
 
 # IQR - mNPX
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, fig.width=8, fig.height=6}
 
 colors4 <- custom_palette(4)
 
@@ -604,7 +603,7 @@ ggplot2::ggplot(sample_stats, aes(x = median_npx, y = iqr_npx, color = Experimen
 
 # Check detection rate
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, fig.width=8, fig.height=6}
 
 # Standardize to biological samples only
 bio_samples <- npx_qc_pca_data |>
@@ -620,9 +619,8 @@ protein_detection <- bio_samples |>
   )
 
 ggplot2::ggplot(protein_detection, aes(x = pct_above_lod)) +
-  ggplot2::geom_histogram(binwidth = 5, fill = "#005EA8", color = "white", boundary = 0) +
+  ggplot2::geom_histogram(binwidth = 10, fill = "#005EA8", color = "white", boundary = 0) +
   ggplot2::geom_vline(xintercept = 25, linetype = "dashed", color = "darkred", linewidth = 0.8) +
-  ggplot2::annotate("text", x = 52, y = Inf, label = "25% Cutoff", vjust = 2, hjust = 0, color = "darkred", fontface = "bold") +
   ggplot2::scale_x_continuous(limits = c(0, 105), breaks = seq(0, 100, by = 10)) +
   ggplot2::labs(
     title = "Distribution of Protein Detection Rates Across Samples",
@@ -695,11 +693,11 @@ ggplot2::ggplot(npx_lod_dist,
 ##############################################
 
 
-# 1. Ensure lod_dist is calculated
+# Ensure lod_dist is calculated
 bio_samples <- bio_samples |>
   dplyr::mutate(lod_dist = NPX - LOD)
 
-# 2. Plot Distance to LOD grouped by Experimental Group
+# Plot Distance to LOD grouped by Experimental Group
 ggplot2::ggplot(bio_samples, aes(x = Group, y = lod_dist, fill = Group)) +
   ggplot2::geom_boxplot(outlier.size = 0.3, alpha = 0.85, outlier.alpha = 0.5) +
   ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "darkred", linewidth = 0.8) +
@@ -759,7 +757,7 @@ cat(sprintf(
 
 # generate PCAs
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, fig.width=8, fig.height=6}
 
 custom_col5 <- custom_palette(5)
 colors4     <- custom_palette(4)
@@ -803,109 +801,12 @@ p_filtered_exp
 
 ```
 
-# DPEA with limma
 
 ```{r, warning = FALSE}
 
-# clean_meta <- npx_qc_pca_data |> 
-#   dplyr::select(SampleID, Group, Experiment) |> 
-#   dplyr::distinct() |> 
-#   dplyr::filter(Group != "Other", Group != "Media Control") 
-# 
-# clean_meta$Group <- factor(clean_meta$Group, levels = c(
-#   "MT Control (NC)", 
-#   "MT Control (TGFb)", 
-#   "MT + Macrophages (NC)", 
-#   "MT + Macrophages (TGFb)"
-# ))
-# 
-# design <- model.matrix(~ 0 + Group + Experiment, data = clean_meta)
-# colnames(design) <- make.names(colnames(design))
-# 
-# # Prepare NPX Expression Matrix ---
-# npx_matrix <- npx_qc_pca_data |>
-#   dplyr::filter(SampleID %in% clean_meta$SampleID) |>
-#   dplyr::select(SampleID, Assay, NPX) |>
-#   tidyr::pivot_wider(names_from = SampleID, values_from = NPX) |>
-#   column_to_rownames("Assay") |>
-#   as.matrix()
-# 
-# npx_matrix <- npx_matrix[, clean_meta$SampleID]
-# 
-# # Fit Linear Model ---
-# fit <- lmFit(npx_matrix, design)
-# 
-# # Define Specific Contrasts ---
-# contrast_matrix <- makeContrasts(
-#   # 1. CMF_TGF vs CMF_NC (Effect of TGFb in MTs alone)
-#   Contrast1_CMFTGF_vs_CMFNC = GroupMT.Control..TGFb. - GroupMT.Control..NC.,
-#   # 2. CMFHM_NC vs CMF_NC (Effect of Healthy Macrophages baseline)
-#   Contrast2_CMFHMNC_vs_CMFNC = GroupMT...Macrophages..NC. - GroupMT.Control..NC.,
-#   # 3. CMFHM_TGF vs CMFHM_NC (Effect of TGFb in co-culture)
-#   Contrast3_CMFHMTGF_vs_CMFHMNC = GroupMT...Macrophages..TGFb. - GroupMT...Macrophages..NC.,
-#   # 4. CMFHM_TGF vs CMF_TGF (Effect of Healthy Macrophages under TGFb)
-#   Contrast4_CMFHMTGF_vs_CMFTGF = GroupMT...Macrophages..TGFb. - GroupMT.Control..TGFb.,
-#   levels = design
-# )
-# 
-# # Fit Contrasts & Empirical Bayes Moderation ---
-# fit_eb <- eBayes(contrasts.fit(fit, contrast_matrix))
-# 
-# # Extract Results Tables for All 4 Contrasts ---
-# res_contrast1 <- topTable(fit_eb, coef = "Contrast1_CMFTGF_vs_CMFNC", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
-# res_contrast2 <- topTable(fit_eb, coef = "Contrast2_CMFHMNC_vs_CMFNC", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
-# res_contrast3 <- topTable(fit_eb, coef = "Contrast3_CMFHMTGF_vs_CMFHMNC", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
-# res_contrast4 <- topTable(fit_eb, coef = "Contrast4_CMFHMTGF_vs_CMFTGF", number = Inf, adjust.method = "BH") |> rownames_to_column("Assay")
-```
+outputdir <- "/Users/sophiewagner/Desktop/USZ 25:26/Gabi_Project_Setup/Olink_Project/OLINK_Data/RDSFiles"
 
-```{r, warning = FALSE}
-
+saveRDS(npx_qc_pca_data, file = file.path(outputdir, "unfiltered_NPXs_annot.rds"))
+saveRDS(npx_filtered, file = file.path(outputdir, "filtered_NPXs_annot.rds"))
 
 ```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-
-```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-
-```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-```
-
-```{r, warning = FALSE}
-
-```
-

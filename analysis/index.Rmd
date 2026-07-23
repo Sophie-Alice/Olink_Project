@@ -12,5 +12,5 @@ Olink Project
 
 ## Data Processing & Global Overview
 
-* [1. Initial Data Inspection](Inspecting_dats.html)
-
+* [1. Initial Data Inspection and LOD filtering](Inspecting_dats.html)
+* [2. DPEA](DPEA.html)

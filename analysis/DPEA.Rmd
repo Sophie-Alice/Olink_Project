@@ -1,0 +1,596 @@
+---
+title: "DPEA"
+author: "Sophie.Alice"
+date: "2026-07-22"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+
+# Setup
+
+```{r, message=FALSE, warning = FALSE}
+rm(list = ls())
+gc()
+
+library(here)
+library(dplyr)
+library(readr)
+library(stringr)
+library(tibble)
+library(ggplot2)
+library(OlinkAnalyze)
+library(DT)
+library(limma)
+library(tidyverse)
+library(tidyr)
+library(ggrepel)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(fgsea)
+library(purrr)
+library(aPEAR)
+
+```
+
+# Functions
+
+```{r, warning = FALSE}
+
+
+##################################### Tables
+
+show_table <- function(df) {
+  DT::datatable(
+    df,
+    extensions = 'Buttons', 
+    options = list(
+      dom = 'Blfrtip',                       
+      buttons = c('copy', 'csv', 'excel', 'pdf'),
+      pageLength = 10,                      
+      lengthMenu = c(10, 25, 50, 100),
+      autoWidth = TRUE,
+      columnDefs = list(list(
+        targets = '_all',
+        className = 'dt-nowrap'
+      ))
+    ),
+    filter = 'top',                         
+    class = 'cell-border stripe hover nowrap'       
+  )
+}
+
+
+```
+
+# Import Data
+
+```{r, warning = FALSE}
+
+data_path <- "/Users/sophiewagner/Desktop/USZ 25:26/Gabi_Project_Setup/Olink_Project/OLINK_Data/RDSfiles/filtered_NPXs_annot.rds"
+
+filt.NPX <- readRDS(data_path)
+
+custom_palette <- colorRampPalette(c("#005EA8", "#6DB335", "#FFD966", "#EDAAD2", "#9F1C67"))
+ann_colors <- custom_palette(8)
+colors5 <- custom_palette(5)
+```
+
+# Check inter Group differences with ANOVA
+
+```{r, warning = FALSE, fig.width=8, fig.height=6}
+# Run ANOVA on NPX across Experimental Groups
+anova_results <- olink_anova(
+  df = filt.NPX,
+  variable = "Group"
+)
+
+sig_anova_ids <- anova_results |>
+  dplyr::filter(Threshold == "Significant") |>
+  dplyr::pull(OlinkID)
+
+# Heatmap showing global group clustering
+olink_heatmap_plot(
+  df = filt.NPX,
+  variable_row_list = c("Group", "Experiment"),
+  olinkid_list = sig_anova_ids,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  show_rownames = FALSE,   
+  show_colnames = FALSE,
+  annotation_colors = ann_colors
+)
+
+length(sig_anova_ids)
+
+# -> 260 proteins are differently expressed between the groups
+```
+
+
+# DPEA with limma
+
+```{r, warning = FALSE}
+
+# NPX data into matrix format (Proteins = Rows, Samples = Columns)
+npx_mat <- filt.NPX |>
+  dplyr::select(SampleID, Assay, NPX) |>
+  tidyr::pivot_wider(names_from = SampleID, values_from = NPX, values_fn = mean) |>
+  tibble::column_to_rownames("Assay") |>
+  as.matrix()
+
+# Extract sample metadata matching the matrix column order
+sample_meta <- filt.NPX |>
+  dplyr::select(SampleID, Group, Experiment) |>
+  dplyr::distinct() |>
+  dplyr::slice(match(colnames(npx_mat), SampleID))
+
+# Clean group names for limma syntax (removes spaces and special characters)
+clean_group <- factor(make.names(sample_meta$Group))
+
+# Create Design Matrix
+design <- model.matrix(~ 0 + clean_group)
+colnames(design) <- levels(clean_group)
+
+
+#############################################
+
+# Fit initial linear model across all proteins
+fit <- lmFit(npx_mat, design)
+
+# Define contrasts
+contrast_matrix <- makeContrasts(
+  # 1. Macrophage effect under TGFb
+  HM_TGF_vs_NC_TGF = MT...Macrophages..TGFb. - MT.Control..TGFb.,
+  # 2. TGFb effect in MT without macrophages
+  NC_TGF_vs_NC_NC  = MT.Control..TGFb. - MT.Control..NC.,
+  # 3. Macrophage effect at baseline (NC)
+  HM_NC_vs_NC_NC   = MT...Macrophages..NC. - MT.Control..NC.,
+  # 4. TGFb effect with Macrophages present
+  HM_TGF_vs_HM_NC  = MT...Macrophages..TGFb. - MT...Macrophages..NC.,
+  # 5. The Interaction term = How does Mac presence affect the response to TGFb?
+  Interaction      = (MT...Macrophages..TGFb. - MT...Macrophages..NC.) - 
+                     (MT.Control..TGFb. - MT.Control..NC.),
+  levels = design
+)
+
+# Fit contrasts & apply Empirical Bayes moderation
+fit_contrasts <- contrasts.fit(fit, contrast_matrix)
+fit_ebayes    <- dBayes <- eBayes(fit_contrasts)
+
+#############################################
+
+
+# Create empty list to hold tables
+limma_results_list <- list()
+
+# Loop through all 5 contrast names and store tables
+for (c_name in colnames(contrast_matrix)) {
+  
+  res_table <- topTable(fit_ebayes, coef = c_name, number = Inf, adjust.method = "BH") |>
+    tibble::rownames_to_column("OlinkID") |>
+    dplyr::mutate(
+      Significance = dplyr::case_when(
+        adj.P.Val < 0.05 & logFC > 0.5  ~ "Up",
+        adj.P.Val < 0.05 & logFC < -0.5 ~ "Down",
+        TRUE                           ~ "Not Sig"
+      )
+    )
+  
+  # Add to named list
+  limma_results_list[[c_name]] <- res_table
+}
+
+```
+
+# Showing the DEP Tables
+
+```{r, warning = FALSE}
+show_table(limma_results_list$NC_TGF_vs_NC_NC)
+show_table(limma_results_list$HM_TGF_vs_HM_NC)
+show_table(limma_results_list$HM_NC_vs_NC_NC)
+show_table(limma_results_list$HM_TGF_vs_NC_TGF)
+show_table(limma_results_list$Interaction)
+```
+
+# showing the DEPs with Volcanoplots
+
+```{r, warning = FALSE, fig.width=8, fig.height=6}
+# Loop through the list of tables and render volcano plots
+for (c_name in names(limma_results_list)) {
+  
+  # get data frame for current comparison
+  res_table <- limma_results_list[[c_name]]
+  
+  # Count up/down significant hits
+  n_up <- sum(res_table$Significance == "Up")
+  n_down <- sum(res_table$Significance == "Down")
+  
+  # Volcano Plot
+  p <- ggplot(res_table, aes(x = logFC, y = -log10(adj.P.Val), color = Significance)) +
+    geom_point(alpha = 0.8, size = 2) +
+    geom_text_repel(
+      data = res_table |> dplyr::filter(Significance != "Not Sig") |> dplyr::slice_min(adj.P.Val, n = 15),
+      aes(label = OlinkID),
+      size = 3.5,
+      max.overlaps = 15,
+      show.legend = FALSE
+    ) +
+    scale_color_manual(values = c("Up" = "#9F1C67", "Down" = "#005EA8", "Not Sig" = "grey70")) +
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +
+    geom_vline(xintercept = c(-0.5, 0.5), linetype = "dotted", color = "black") +
+    theme_bw(base_size = 12) +
+    labs(
+      title = paste("DEPs:", c_name),
+      subtitle = paste0("Up: ", n_up, " | Down: ", n_down, " (FDR < 0.05, |logFC| > 0.5)"),
+      x = "Log2 Fold Change (NPX Difference)",
+      y = "-log10 FDR"
+    ) +
+    theme(plot.title = element_text(face = "bold", size = 12),
+          plot.subtitle = element_text(face = "italic", size = 10))
+  
+  print(p)
+}
+```
+
+# Deeper look into the interaction term Protein hits
+
+Aka How does Mac presence affect the response to TGFb?
+
+Genes that have a > 0.5 log2FC amplify the TGFb response
+Genes that have a < -0.5 log2FC dampen the TGFb response
+
+```{r, warning = FALSE}
+# Extract top up proteins (FDR < 0.05 and logFC > 0.5) -> TOP 6
+up_hits <- limma_results_list$Interaction |>
+  dplyr::filter(adj.P.Val < 0.05 & logFC > 0.5) |>
+  dplyr::arrange(adj.P.Val)
+
+# Extract top up proteins (FDR < 0.05 and logFC < 0.5) -> TOP 6
+down_hits <- limma_results_list$Interaction |>
+  dplyr::filter(adj.P.Val < 0.05 & logFC < -0.5) |>
+  dplyr::arrange(adj.P.Val)
+
+top_up_assays   <- up_hits$OlinkID
+top_down_assays <- down_hits$OlinkID
+
+################################## show boxplots up hits
+
+# Define chunk size 
+chunk_size <- 8
+assay_chunks <- split(top_up_assays, ceiling(seq_along(top_up_assays) / chunk_size))
+
+
+for (i in seq_along(assay_chunks)) {
+  
+  current_assays <- assay_chunks[[i]]
+  
+  p <- filt.NPX |>
+    dplyr::filter(Assay %in% current_assays) |>
+    dplyr::mutate(Assay = factor(Assay, levels = current_assays)) |>
+    ggplot(aes(x = Group, y = NPX)) +
+    geom_boxplot(aes(fill = Group), outlier.shape = NA, alpha = 0.6) +
+    geom_jitter(
+      aes(color = AboveLOD), 
+      width = 0.15, size = 2, alpha = 0.85
+    ) +
+    scale_fill_manual(values = colors5) +
+    
+    scale_color_manual(
+      values = c("FALSE" = "darkred", "TRUE" = "black"),
+      labels = c("Below LOD", "Above LOD"),
+      name = "Detection") +
+    facet_wrap(~ Assay, scales = "free_y", ncol = 4) +
+    theme_bw(base_size = 10) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "bottom",
+      strip.background = element_rect(fill = "darkgrey", color = NA),
+      strip.text = element_text(color = "black", face = "bold"),
+      plot.title = element_text(face = "bold", size = 12),
+      plot.subtitle = element_text(face = "italic", size = 10)) +
+    labs(
+      title = paste0("Amplifying Hits (Page ", i, " of ", length(assay_chunks), ")"),
+      subtitle = "Red dots = hits below the LOD",
+      x = NULL,
+      y = "NPX Value"
+    )
+  print(p)
+}
+
+################################## show boxplots down hits
+
+# Define chunk size 
+chunk_size <- 8
+assay_chunks <- split(top_down_assays, ceiling(seq_along(top_down_assays) / chunk_size))
+
+
+for (i in seq_along(assay_chunks)) {
+  
+  current_assays <- assay_chunks[[i]]
+  
+  p <- filt.NPX |>
+    dplyr::filter(Assay %in% current_assays) |>
+    dplyr::mutate(Assay = factor(Assay, levels = current_assays)) |>
+    ggplot(aes(x = Group, y = NPX)) +
+    geom_boxplot(aes(fill = Group), outlier.shape = NA, alpha = 0.6) +
+    geom_jitter(
+      aes(color = AboveLOD), 
+      width = 0.15, size = 2, alpha = 0.85
+    ) +
+    scale_fill_manual(values = colors5) +
+    
+    scale_color_manual(
+      values = c("FALSE" = "darkred", "TRUE" = "black"),
+      labels = c("Below LOD", "Above LOD"),
+      name = "Detection") +
+    facet_wrap(~ Assay, scales = "free_y", ncol = 4) +
+    theme_bw(base_size = 10) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "bottom",
+      strip.background = element_rect(fill = "darkgrey", color = NA),
+      strip.text = element_text(color = "black", face = "bold"),
+      plot.title = element_text(face = "bold", size = 12),
+      plot.subtitle = element_text(face = "italic", size = 10)) +
+    labs(
+      title = paste0("Dampening Hits (Page ", i, " of ", length(assay_chunks), ")"),
+      subtitle = "Red dots = hits below the LOD",
+      x = NULL,
+      y = "NPX Value"
+    )
+  print(p)
+}
+
+```
+
+# fGSEA with Hallmark pathways
+
+```{r, warning = FALSE}
+
+Hallmark.pathways <- gmtPathways("/Users/sophiewagner/Desktop/USZ 25:26/Gabi_Project_Setup/Laila_MT_Project/Laila_MT_Project/Hallmark/h.all.v2026.1.Hs.symbols.gmt")
+
+##################################### Function of Hallmark fGSEA
+
+run_gsea_pipeline <- function(degs_df, comparison_name, pathways = Hallmark.pathways, top_n = 15) {
+  
+  # Clean data & create ranked named vector
+  protein_ranked_df <- degs_df %>%
+    dplyr::select(OlinkID, logFC) %>% 
+    na.omit() %>%
+    distinct() %>%
+    group_by(OlinkID) %>%
+    summarize(log2FC = mean(logFC, na.rm = TRUE)) %>%
+    arrange(desc(log2FC))
+  
+  ranked_proteins <- deframe(protein_ranked_df)
+  
+  # Run GSEA (Using fgseaMultilevel)
+  fgseares <- fgseaMultilevel(pathways = pathways, stats = ranked_proteins)
+  
+  # Process Tidy Results
+  fgseares.tidy <- fgseares %>%
+    as_tibble() %>%  
+    arrange(desc(NES))
+  
+  # Extract Top Up and Down pathways
+  fgseares.tidy.top.up   <- head(fgseares.tidy, top_n)
+  fgseares.tidy.top.down <- tail(fgseares.tidy, top_n)
+  fgseares.tidy.top.both <- bind_rows(fgseares.tidy.top.up, fgseares.tidy.top.down)
+  
+  # Format dataframe for plotting
+  plot_df <- fgseares.tidy.top.both %>%
+    mutate(
+      padj_group = case_when(
+        padj <= 0.05 ~ "< 0.05",
+        padj <= 0.2  ~ "0.05 – 0.2",
+        TRUE         ~ "> 0.2"
+      ),
+      padj_group = factor(padj_group, levels = c("< 0.05", "0.05 – 0.2", "> 0.2")),
+      pathway = gsub("HALLMARK_", "", pathway)
+    )
+  
+  # Generate Plot
+  p <- ggplot(plot_df, aes(reorder(pathway, NES), NES)) +
+    geom_col(aes(fill = padj_group), color = "black", linewidth = 0.2) +
+    coord_flip() +
+    scale_x_discrete(position = "top", labels = scales::label_wrap(50)) +
+    scale_fill_manual(
+      name = "adj. p-value",
+      values = c(
+        "< 0.05"     = "#9F1C67",   
+        "0.05 – 0.2" = "#FFD966",   
+        "> 0.2"      = "#005EA8"    
+      ),
+      drop = FALSE 
+    ) +
+    labs(
+      x = "", 
+      y = "Normalized Enrichment Score (NES)", 
+      title = "GSEA: Hallmark Pathways",
+      subtitle = paste("Comparison:", comparison_name)
+    ) +
+    theme_bw() +
+    theme(
+      aspect.ratio    = 1.4, 
+      axis.text.y     = element_text(size = 8, hjust = 0), 
+      axis.title      = element_text(face = "bold"),
+      plot.title      = element_text(hjust = 0, face = "bold"),
+      plot.subtitle   = element_text(hjust = 0, size = 9, face = "italic"),
+      legend.position = "left" 
+    )
+  
+  # Return both table and plot in a list
+  return(list(
+    results_table = fgseares.tidy,
+    plot          = p
+  ))
+}
+
+########################################
+
+# Run GSEA for every dataset in the list
+gsea_results_list <- imap(limma_results_list, function(df, contrast_name) {
+  run_gsea_pipeline(degs_df = df, comparison_name = contrast_name)
+})
+
+# show results
+gsea_results_list$HM_TGF_vs_NC_TGF$plot
+show_table(gsea_results_list$HM_TGF_vs_NC_TGF$results_table)
+
+gsea_results_list$NC_TGF_vs_NC_NC$plot
+show_table(gsea_results_list$NC_TGF_vs_NC_NC$results_table)
+
+gsea_results_list$HM_NC_vs_NC_NC$plot
+show_table(gsea_results_list$HM_NC_vs_NC_NC$results_table)
+
+gsea_results_list$HM_TGF_vs_HM_NC$plot
+show_table(gsea_results_list$HM_TGF_vs_HM_NC$results_table)
+
+gsea_results_list$Interaction$plot
+show_table(gsea_results_list$Interaction$results_table)
+
+
+```
+
+
+# fGSEA with ClusterProfiler 
+
+```{r, warning = FALSE}
+
+protein_ranked_df <- limma_results_list$HM_TGF_vs_HM_NC %>%
+    dplyr::select(OlinkID, logFC) %>% 
+    na.omit() %>%
+    distinct() %>%
+    group_by(OlinkID) %>%
+    summarize(log2FC = mean(logFC, na.rm = TRUE)) %>%
+    arrange(desc(log2FC))
+  
+ranked_proteins <- deframe(protein_ranked_df)
+  
+
+gse_go_res <- gseGO(
+  geneList     = ranked_proteins,
+  OrgDb        = org.Hs.eg.db,
+  keyType      = "SYMBOL",       
+  ont          = "BP",           
+  minGSSize    = 10,
+  maxGSSize    = 500,
+  pvalueCutoff = 0.1,
+  pAdjustMethod = "BH"
+)
+
+dotplot(
+  gse_go_res, 
+  showCategory = 10, 
+  split = ".sign", 
+  title = "GO Biological Processes: Activated vs Suppressed"
+) + 
+  facet_grid(. ~ .sign) +
+  theme_bw() +
+  theme(
+    axis.text.y = element_text(size = 9),
+    plot.title  = element_text(face = "bold", size = 12)
+  )
+
+# 
+# gsea_sig_df <- gse_go_res@result %>%
+#   dplyr::filter(p.adjust < 0.05)  
+# 
+# p_apear <- enrichmentNetwork(
+#   enrichment = gsea_sig_df,
+#   repelLabels = TRUE,
+#   drawEllipses = TRUE,
+#   fontSize     = 3,
+#   simMethod = "jaccard",
+#   clustMethod = "hier",
+#   colorBy      = "NES",        
+#   colorType    = "nes"  
+# )
+# 
+# p_apear <- p_apear + labs(
+#   title    = "Network of Significant GO-BP Terms Identified by GSEA",
+#   subtitle = "MT-Fibroblasts: differences in CMF_TGF compared to CMF_NC",
+#   color    = "NES",       
+# ) +
+# theme(
+#   plot.title.position = "plot",
+#   plot.title    = element_text(face = "bold", size = 12, hjust = 0),
+#   plot.subtitle = element_text(face = "italic", size = 10, hjust = 0)
+# )
+# 
+# print(p_apear)
+
+```
+
+
+# ORA
+
+## GO PB
+
+ niet 
+ 
+```{r, warning = FALSE}
+
+up_hits <- limma_results_list$HM_TGF_vs_NC_TGF |>
+  dplyr::filter(adj.P.Val < 0.05 & logFC > 0.5) |>
+  dplyr::arrange(adj.P.Val)
+
+# Extract top up proteins (FDR < 0.05 and logFC < 0.5) -> TOP 6
+down_hits <- limma_results_list$HM_TGF_vs_NC_TGF |>
+  dplyr::filter(adj.P.Val < 0.05 & logFC < -0.5) |>
+  dplyr::arrange(adj.P.Val)
+
+top_up_assays   <- up_hits$OlinkID
+top_down_assays <- down_hits$OlinkID
+
+# GO Biological Process Enrichment
+ego_amp <- enrichGO(
+  gene          = top_up_assays,
+  OrgDb         = org.Hs.eg.db,
+  ont           = "BP", # Biological Process
+  pAdjustMethod = "none",
+  pvalueCutoff  = 0.9
+)
+
+# Visualize Top 10 Enriched Terms
+#dotplot(ego_amp, showCategory = 10, title = "GO BP: Amplifying Hits")
+
+
+
+ego_amp <- enrichGO(
+  gene          = top_down_assays,
+  OrgDb         = org.Hs.eg.db,
+  ont           = "BP", # Biological Process
+  pAdjustMethod = "none",
+  pvalueCutoff  = 0.5
+)
+
+# Visualize Top 10 Enriched Terms
+#dotplot(ego_amp, showCategory = 10, title = "GO BP: Amplifying Hits")
+```
+
+
+
+```{r, warning = FALSE}
+
+
+```
+
+```{r, warning = FALSE}
+
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+```
+
+```{r, warning = FALSE}
+
+```
+
